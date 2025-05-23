@@ -69,12 +69,48 @@ def generate_icon(payload: GenerateRequest):
     image = pipe(prompt, num_inference_steps=payload.steps).images[0]
     image = image.resize((payload.resolution, payload.resolution), Image.LANCZOS)
 
+    # Prepare image for icon download
     buffered = io.BytesIO()
     save_format = "JPEG" if payload.format.lower() == "jpeg" else "PNG"
     image.save(buffered, format=save_format)
     img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-    return JSONResponse(content={"image": img_str, "used_cuda": used_cuda, "cuda_message": cuda_message})
+    # --- Favicon generation fix ---
+    # image is a PIL.Image, use it directly for favicon sizes
+    favicon_buffer = io.BytesIO()
+    sizes = [(16, 16), (32, 32)]
+    # Create icon in memory (ensure the main image is RGBA for .ico)
+    img_for_ico = image.convert('RGBA')
+    img_for_ico.save(favicon_buffer, format="ICO", sizes=sizes)
+    favicon_buffer.seek(0)
+    favicon_b64 = base64.b64encode(favicon_buffer.read()).decode("utf-8")
+    # --- End fix ---
+
+    return JSONResponse(content={
+        "image": img_str,
+        "favicon": favicon_b64,
+        "used_cuda": used_cuda,
+        "cuda_message": cuda_message
+    })
 
 # Mount React static build LAST, so it won't override /api/* endpoints
 app.mount("/", StaticFiles(directory="frontend/build", html=True), name="frontend")
+
+
+def create_favicon(input_path, output_path="favicon.ico"):
+    """
+    Convert input image (PNG or JPEG) into a favicon.ico containing 16x16 and 32x32 sizes.
+    """
+    img = Image.open(input_path)
+    # Ensure alpha for PNGs and proper conversion for JPEG
+    if img.mode not in ("RGBA", "RGB"):
+        img = img.convert("RGBA")
+    sizes = [(16, 16), (32, 32)]
+    resized_images = [img.resize(size, Image.LANCZOS) for size in sizes]
+    # Save as .ico with both sizes
+    resized_images[0].save(
+        output_path,
+        format="ICO",
+        sizes=sizes
+    )
+    return output_path

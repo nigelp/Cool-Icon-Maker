@@ -4,23 +4,26 @@ import './App.css';
 function App() {
   const [prompt, setPrompt] = useState('');
   const [imgSrc, setImgSrc] = useState(null);
+  const [faviconB64, setFaviconB64] = useState(null); 
   const [loading, setLoading] = useState(false);
   const [useCuda, setUseCuda] = useState(false);
   const [resolution, setResolution] = useState('64');
   const [steps, setSteps] = useState('20');
   const [format, setFormat] = useState('jpeg');
 
-  /**
-   * Calls the backend to generate an icon image.
-   * @returns {Promise<void>}
-   */
   const generateIcon = async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, use_cuda: useCuda, resolution: parseInt(resolution), steps: parseInt(steps), format }),
+        body: JSON.stringify({
+          prompt,
+          use_cuda: useCuda,
+          resolution: parseInt(resolution),
+          steps: parseInt(steps),
+          format
+        }),
       });
       if (!response.ok) {
         throw new Error('API request failed');
@@ -28,14 +31,34 @@ function App() {
       const data = await response.json();
       const mimeType = format === 'jpeg' ? 'jpeg' : 'png';
       setImgSrc(`data:image/${mimeType};base64,${data.image}`);
-      
+      setFaviconB64(data.favicon ? data.favicon : null); 
     } catch (error) {
       console.error('Error generating icon:', error);
       setImgSrc(null);
+      setFaviconB64(null);
     } finally {
       setLoading(false);
     }
   };
+
+  function downloadFavicon(base64String) {
+    const byteString = atob(base64String);
+    const arrayBuffer = new ArrayBuffer(byteString.length);
+    const intArray = new Uint8Array(arrayBuffer);
+    for (let i = 0; i < byteString.length; i++) {
+      intArray[i] = byteString.charCodeAt(i);
+    }
+    const blob = new Blob([intArray], { type: 'image/x-icon' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'favicon.ico';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="App">
@@ -88,8 +111,44 @@ function App() {
             <h2>Result:</h2>
             <img src={imgSrc} alt="Generated icon" style={{ maxWidth: '256px' }} />
             <br />
-            <a href={imgSrc} download={`icon.${format}`} className="blue-button download-button">Download Icon</a>
-          </div>
+            <button
+              className="blue-button download-button"
+              onClick={() => {
+                const arr = imgSrc.split(',');
+                const mime = arr[0].match(/:(.*?);/)[1];
+                const bstr = atob(arr[1]);
+                let n = bstr.length;
+                const u8arr = new Uint8Array(n);
+                while (n--) {
+                  u8arr[n] = bstr.charCodeAt(n);
+                }
+                const blob = new Blob([u8arr], { type: mime });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `icon.${format}`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+              }}
+            >
+              Download Icon
+            </button>
+            <br />
+            {faviconB64 && (
+              <>
+                <br />
+                <button
+                  className="blue-button download-button"
+                  onClick={() => downloadFavicon(faviconB64)}
+                  style={{ marginTop: 8 }}
+                >
+                  Download Favicon (.ico)
+                </button>
+              </>
+            )}
+           </div>
         )}
       </div>
     </div>
