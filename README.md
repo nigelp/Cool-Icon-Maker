@@ -15,6 +15,7 @@ An MVP app to generate colorful app icons locally on your computer using Stable 
 - Generates colorful icons in 512x512 or 64x64 format
 - Choice of LLM resolution - 20 steps or 50 steps
 - Choice of file format - JPEG or PNG
+- Option to download favicon
 ---
 
 ## Requirements
